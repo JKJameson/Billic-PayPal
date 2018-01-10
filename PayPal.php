@@ -124,14 +124,12 @@ class PayPal {
 		curl_close($ch);
 		if (strcmp($data, 'VERIFIED') == 0) {
 			$billic->module('Invoices');
-			//$billic->email('josh@servebyte.com', 'PayPal Debug', json_encode($_POST));
 			if (strpos($_POST['item_name'], 'Invoice #') !== false) {
 				preg_match('~Invoice #([0-9]+)~', $_POST['item_name'], $invoiceid);
 				$invoiceid = $invoiceid[1];
 			} else if (strpos($_POST['item_name'], 'Service #') !== false) {
 				preg_match('~Service \#([0-9]+)~', $_POST['item_name'], $serviceid);
 				$serviceid = $serviceid[1];
-				//$billic->email('josh@servebyte.com', 'PayPal Debug', 'Service ID: '.$serviceid);
 				$invoiceid = $db->q('SELECT `invoiceid` FROM `invoiceitems` WHERE `relid` = ? ORDER BY `id` DESC', $serviceid);
 				$invoiceid = $invoiceid[0]['invoiceid'];
 				$generate = false;
@@ -144,7 +142,6 @@ class PayPal {
 						$generate = true;
 					}
 				}
-				//$billic->email('josh@servebyte.com', 'PayPal Debug', 'Invoice ID: '.$serviceid);
 				if ($generate) {
 					$service = $db->q('SELECT * FROM `services` WHERE `id` = ?', $serviceid);
 					$service = $service[0];
@@ -155,8 +152,6 @@ class PayPal {
 						'user' => $user,
 						'duedate' => $service['nextduedate'],
 					));
-					//$billic->email('josh@servebyte.com', 'PayPal Debug', 'Invoice ID: '.$serviceid);
-					
 				}
 			}
 			if (!is_numeric($invoiceid)) {
