@@ -12,11 +12,18 @@ class PayPal {
 		if (get_config('paypal_email') == '') {
 			return $html;
 		}
+		$limit_users_before = get_config('paypal_limit_users_before');
+		if (!empty($limit_users_before)) {
+			$time = strtotime($limit_users_before);
+			if ($billic->user['datecreated']>$time)
+				return false;
+		}
 		if ($billic->user['verified'] == 0 && get_config('paypal_require_verification') == 1) {
 			return 'verify';
 		} else {
 			// One-time payment button
-			$html.= '<form action="https://www.paypal.com/cgi-bin/webscr" method="post">' . PHP_EOL;
+			$html.= '<style>.pp-form-pay {float:left}</style>';
+			$html.= '<form class="pp-form-pay" action="https://www.paypal.com/cgi-bin/webscr" method="post">' . PHP_EOL;
 			$html.= '<input type="hidden" name="cmd" value="_xclick">' . PHP_EOL;
 			$html.= '<input type="hidden" name="business" value="' . get_config('paypal_email') . '"><input type="hidden" name="item_name" value="Invoice #' . $params['invoice']['id'] . '">' . PHP_EOL;
 			$html.= '<input type="hidden" name="amount" value="' . $params['charge'] . '">' . PHP_EOL;
@@ -69,7 +76,8 @@ class PayPal {
 			}
 			if ($serviceid !== false) {
 				// Subscription payment button
-				$html.= '<form action="https://www.paypal.com/cgi-bin/webscr" method="post">' . PHP_EOL;
+				$html.= '<style>.pp-form-sub {float:left;padding-left: 20px}</style>';
+				$html.= '<form class="pp-form-sub" action="https://www.paypal.com/cgi-bin/webscr" method="post">' . PHP_EOL;
 				$html.= '<input type="hidden" name="cmd" value="_xclick-subscriptions">' . PHP_EOL;
 				$html.= '<input type="hidden" name="business" value="' . get_config('paypal_email') . '"><input type="hidden" name="item_name" value="Service #' . $serviceid . '">' . PHP_EOL;
 				$html.= '<input type="hidden" name="src" value="1">' . PHP_EOL;
@@ -178,13 +186,33 @@ class PayPal {
 			echo '<form method="POST"><input type="hidden" name="billic_ajax_module" value="PayPal"><table class="table table-striped">';
 			echo '<tr><th>Setting</th><th>Value</th></tr>';
 			echo '<tr><td>Require Verification</td><td><input type="checkbox" name="paypal_require_verification" value="1"' . (get_config('paypal_require_verification') == 1 ? ' checked' : '') . '></td></tr>';
+			echo '<tr><td>Limit Payments</td><td>from users registered before <input type="text" name="paypal_limit_users_before" value="' . safe(get_config('paypal_limit_users_before')). '" placeholder="YYYY-MM-DD" class="form-control" style="max-width: 150px;display:inline">. Leave blank to disable.</td></tr>';
 			echo '<tr><td>PayPal Email</td><td><input type="text" class="form-control" name="paypal_email" value="' . safe(get_config('paypal_email')) . '"></td></tr>';
 			echo '<tr><td colspan="2" align="center"><input type="submit" class="btn btn-default" name="update" value="Update &raquo;"></td></tr>';
 			echo '</table></form>';
 		} else {
+			$date = explode('-', $_POST['paypal_limit_users_before']);
+			if (count($date)==1 && empty($date[0])) {
+				// empty date
+			} else {
+				if (strlen($date[0])!==4 || strlen($date[1])!==2 || strlen($date[2])!==2)
+					$billic->errors[] = 'Invalid date';
+				elseif (!ctype_digit($date[0]) || $date[0]<1970)
+					$billic->errors[] = 'Invalid year';
+				elseif (!ctype_digit($date[1]) || $date[1]<1 || $date[1]>12)
+					$billic->errors[] = 'Invalid month';
+				elseif (!ctype_digit($date[2]) || $date[1]<1 || $date[1]>31)
+					$billic->errors[] = 'Invalid day';
+				else {
+					$daysInMonth = date('t', mktime(0, 0, 1, $date[1], 1, $date[0]));
+					if ($date[2]>$daysInMonth)
+						$billic->errors[] = "There are only $daysInMonth days in the month";
+				}
+			}
 			if (empty($billic->errors)) {
 				set_config('paypal_require_verification', $_POST['paypal_require_verification']);
 				set_config('paypal_email', $_POST['paypal_email']);
+				set_config('paypal_limit_users_before', $_POST['paypal_limit_users_before']);
 				$billic->status = 'updated';
 			}
 		}
